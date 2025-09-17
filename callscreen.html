@@ -7,7 +7,7 @@
     body {
       font-family: 'Segoe UI', sans-serif;
       text-align: center;
-      background: #00455D;
+      background: #F3E6D3;
       color: white;
       padding-top: 60px;
       display: flex;
@@ -19,11 +19,11 @@
     #ticket {
       font-size: 80px;
       margin-bottom: 20px;
-      color: white;
+      color: rgb(0, 0, 0);
     }
     #window {
       font-size: 48px;
-      color: #ffa500;
+      color: #0095ff;
     }
     #unlocked {
       color: lime;
@@ -32,15 +32,23 @@
     audio {
       display: none;
     }
-
     .blink {
       animation: blink-animation 0.3s steps(1, start) 6;
     }
-
     @keyframes blink-animation {
       50% {
         opacity: 0;
       }
+    }
+    /* 👇 New footer style */
+    #footer {
+      position: fixed;
+      bottom: 10px;
+      left: 10px;
+      font-size: 16px;
+      color: #353535;
+      opacity: 0.8;
+      font-style: italic;
     }
   </style>
 </head>
@@ -53,6 +61,9 @@
   <audio id="ding" preload="auto">
     <source src="ding.ogg" type="audio/ogg">
   </audio>
+
+  <!-- 👇 Footer -->
+  <div id="footer">Solution by jmactivations.com</div>
 
   <script>
     const API_BASE_URL = "https://qpayapi.jmactivations.com"; // <-- Change this to your actual IP
