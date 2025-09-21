@@ -19,11 +19,11 @@
     #ticket {
       font-size: 80px;
       margin-bottom: 20px;
-      color: rgb(0, 0, 0);
+      color: black;
     }
     #window {
       font-size: 48px;
-      color: #0095ff;
+      color: #ffa500;
     }
     #unlocked {
       color: lime;
@@ -32,23 +32,58 @@
     audio {
       display: none;
     }
+
     .blink {
       animation: blink-animation 0.3s steps(1, start) 6;
     }
+
     @keyframes blink-animation {
       50% {
         opacity: 0;
       }
     }
-    /* 👇 New footer style */
-    #footer {
+
+    /* ✅ Active windows grid at bottom */
+    #history {
       position: fixed;
-      bottom: 10px;
-      left: 10px;
-      font-size: 16px;
-      color: #353535;
-      opacity: 0.8;
-      font-style: italic;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      background: rgba(0,0,0,0.85);
+      padding: 20px;
+    }
+    #history h2 {
+      font-size: 22px;
+      margin-bottom: 10px;
+      text-align: center;
+      color: #ffa500;
+    }
+    #history-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      grid-template-rows: repeat(2, auto);
+      gap: 10px;
+    }
+    .history-card {
+      background: rgba(255,255,255,0.1);
+      padding: 10px;
+      border-radius: 6px;
+      font-size: 18px;
+      transition: background 0.3s;
+    }
+    .history-card strong {
+      display: block;
+      font-size: 22px;
+      color: #ffa500;
+    }
+
+    /* ✅ Highlight new ticket */
+    .new-ticket {
+      animation: new-ticket-blink 1s ease-in-out 3;
+    }
+    @keyframes new-ticket-blink {
+      0%, 100% { background: rgba(255,255,255,0.1); }
+      50% { background: rgba(255,165,0,0.7); }
     }
   </style>
 </head>
@@ -62,15 +97,19 @@
     <source src="ding.ogg" type="audio/ogg">
   </audio>
 
-  <!-- 👇 Footer -->
-  <div id="footer">Solution by jmactivations.com</div>
+  <!-- ✅ Active Windows Grid -->
+  <div id="history">
+    <h2>Currently Serving</h2>
+    <div id="history-grid"></div>
+  </div>
 
   <script>
-    const API_BASE_URL = "https://qpayapi.jmactivations.com"; // <-- Change this to your actual IP
-    const queue = [];
+    const API_BASE_URL = "https://qpayapi.jmactivations.com"; // <-- Change this to your actual API
     let selectedVoice = null;
     let audioUnlocked = false;
-    let isSpeaking = false;
+
+    // ✅ Track active windows with update order
+    const activeTickets = new Map(); // window -> ticket
 
     document.body.addEventListener("click", () => {
       if (!audioUnlocked) {
@@ -87,10 +126,12 @@
     function pickBestEnglishVoice() {
       const voices = speechSynthesis.getVoices();
       const englishVoices = voices.filter(v => v.lang.startsWith("en"));
-      return englishVoices.find(v =>
-        v.name.includes("Samantha") || v.name.includes("Karen") ||
-        v.name.includes("Daniel") || v.name.includes("Shelley")
-      ) || englishVoices[0];
+
+      // ✅ Prioritize Google US English
+      return englishVoices.find(v => v.name.includes("Google US English")) ||
+             englishVoices.find(v => v.name.includes("Samantha")) ||
+             englishVoices.find(v => v.name.includes("Bubbles")) ||
+             englishVoices[0];
     }
 
     function triggerSpeech(text) {
@@ -103,12 +144,13 @@
 
         const utter = new SpeechSynthesisUtterance(text);
         utter.voice = selectedVoice;
-        utter.lang = selectedVoice.lang || 'en-US';
+        utter.lang = "en-US"; // Force en-US
+
         utter.onend = () => {
-          setTimeout(() => resolve(), 500); // Delay before next poll
+          setTimeout(() => resolve(), 500);
         };
 
-        console.log("📣 Speaking:", text);
+        console.log("📣 Speaking:", text, "with", utter.voice?.name);
         speechSynthesis.speak(utter);
       });
     }
@@ -122,33 +164,73 @@
       });
     }
 
+    function updateHistory(ticket, window) {
+      // ✅ Remove window if it already exists, so we can re-insert at front
+      if (activeTickets.has(window)) {
+        activeTickets.delete(window);
+      }
+      // Insert window-ticket pair at the front
+      const newMap = new Map([[window, ticket]]);
+      for (const [w, t] of activeTickets) {
+        newMap.set(w, t);
+      }
+      // Replace with trimmed map (max 6)
+      activeTickets.clear();
+      let count = 0;
+      for (const [w, t] of newMap) {
+        if (count < 6) {
+          activeTickets.set(w, t);
+          count++;
+        } else break;
+      }
+
+      // Render grid
+      const grid = document.getElementById("history-grid");
+      grid.innerHTML = "";
+
+      let i = 0;
+      for (const [win, t] of activeTickets) {
+        const card = document.createElement("div");
+        card.className = "history-card";
+        card.innerHTML = `<strong>${t}</strong>Window ${win}`;
+
+        if (i === 0) {
+          card.classList.add("new-ticket"); // highlight newest
+        }
+
+        grid.appendChild(card);
+        i++;
+      }
+    }
+
     async function pollAnnouncements() {
       while (audioUnlocked) {
         try {
           const response = await fetch(`${API_BASE_URL}/latest-announcement`);
           if (response.status === 204) {
-            await delay(2000); // No ticket, wait and retry
+            await delay(2000);
             continue;
           }
 
           const data = await response.json();
           if (!data || !data.ticket_number || !data.desk_name) continue;
 
-          // Update UI
+          // Update main display
+          document.getElementById("ticket").innerText =
+            "Now Serving: " + data.ticket_number;
+          document.getElementById("window").innerText =
+            "At Window: " + data.desk_name;
+
+          // Blink effect
           const ticketEl = document.getElementById("ticket");
           const windowEl = document.getElementById("window");
+          ticketEl.classList.remove("blink"); void ticketEl.offsetWidth; ticketEl.classList.add("blink");
+          windowEl.classList.remove("blink"); void windowEl.offsetWidth; windowEl.classList.add("blink");
 
-          ticketEl.innerText = "Now Serving: " + data.ticket_number;
-          windowEl.innerText = "At Window: " + data.desk_name;
+          // ✅ Update active windows
+          updateHistory(data.ticket_number, data.desk_name);
 
-          ticketEl.classList.remove("blink");
-          void ticketEl.offsetWidth; // trigger reflow
-          ticketEl.classList.add("blink");
-
-          windowEl.classList.remove("blink");
-          void windowEl.offsetWidth;
-          windowEl.classList.add("blink");
-
+          // Speak
           const prefix = data.ticket_number.replace(/[0-9]/g, '');
           const number = parseInt(data.ticket_number.replace(/[^0-9]/g, ''), 10);
           const message = `Customer number ${prefix} ${number}, window number ${data.desk_name}`;
