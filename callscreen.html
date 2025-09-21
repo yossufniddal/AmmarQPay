@@ -85,6 +85,15 @@
       0%, 100% { background: rgba(255,255,255,0.1); }
       50% { background: rgba(255,165,0,0.7); }
     }
+
+    /* ✅ Credit label */
+    #credit {
+      position: fixed;
+      bottom: 5px;
+      left: 10px;
+      font-size: 14px;
+      color: #ccc;
+    }
   </style>
 </head>
 <body>
@@ -102,6 +111,7 @@
     <h2>Currently Serving</h2>
     <div id="history-grid"></div>
   </div>
+  <div id="credit">Solution by jmactivations.com</div>
 
   <script>
     const API_BASE_URL = "https://qpayapi.jmactivations.com"; // <-- Change this to your actual API
